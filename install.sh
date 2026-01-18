@@ -78,9 +78,11 @@ backup_config() {
         local backup_path="${config_path}.backup.$(date +%Y%m%d_%H%M%S)"
         log_warning "Backing up existing $config_name to $backup_path"
         mv "$config_path" "$backup_path"
-        return 0
+    else
+        log_info "No existing $config_name to backup"
     fi
-    return 1
+    # Always return 0 to prevent set -e from exiting
+    return 0
 }
 
 # Install packages based on OS
@@ -366,8 +368,9 @@ setup_shell_integrations() {
 
     # Ensure .zshrc exists
     if [ ! -f "$shell_config" ]; then
-        log_warning ".zshrc not found. Oh My Zsh should have created it."
-        return 1
+        log_warning ".zshrc not found. Skipping shell integrations."
+        log_info "You can manually create ~/.zshrc or install Oh My Zsh first."
+        return 0
     fi
 
     # Add Homebrew PATH setup for macOS (must be before aliases)
@@ -566,12 +569,12 @@ main() {
             install_nerd_fonts || log_warning "Font installation failed, install manually"
 
             # Install configurations
-            install_tmux_config
-            install_nvim_config
+            install_tmux_config || log_warning "Tmux config installation had issues"
+            install_nvim_config || log_warning "Neovim config installation had issues"
 
             # Only install kitty config if kitty is available
             if command_exists kitty; then
-                install_kitty_config
+                install_kitty_config || log_warning "Kitty config installation had issues"
             else
                 log_warning "Kitty not installed, skipping config installation"
             fi
@@ -580,7 +583,7 @@ main() {
             install_oh_my_zsh || log_warning "Oh My Zsh installation had issues"
 
             # Setup shell integrations
-            setup_shell_integrations
+            setup_shell_integrations || log_warning "Shell integrations had issues"
             ;;
 
         2)
@@ -624,27 +627,27 @@ main() {
 
             # Install configurations
             if command_exists tmux; then
-                install_tmux_config
+                install_tmux_config || log_warning "Tmux config installation had issues"
             fi
 
             if command_exists nvim; then
-                install_nvim_config
+                install_nvim_config || log_warning "Neovim config installation had issues"
             fi
 
             if command_exists kitty; then
-                install_kitty_config
+                install_kitty_config || log_warning "Kitty config installation had issues"
             else
                 log_warning "Kitty not installed, skipping config installation"
             fi
 
             # Setup shell integrations
-            setup_shell_integrations
+            setup_shell_integrations || log_warning "Shell integrations had issues"
             ;;
 
         4)
             # Install tmux config only
             if command_exists tmux; then
-                install_tmux_config
+                install_tmux_config || log_warning "Tmux config installation had issues"
             else
                 log_error "Tmux is not installed. Please install it first."
                 exit 1
@@ -656,7 +659,7 @@ main() {
         5)
             # Install nvim config only
             if command_exists nvim; then
-                install_nvim_config
+                install_nvim_config || log_warning "Neovim config installation had issues"
             else
                 log_error "Neovim is not installed. Please install it first."
                 exit 1
@@ -668,7 +671,7 @@ main() {
         6)
             # Install kitty config only
             if command_exists kitty; then
-                install_kitty_config
+                install_kitty_config || log_warning "Kitty config installation had issues"
             else
                 log_error "Kitty is not installed. Please install it first."
                 exit 1
