@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
 # Terminal Setup Installation Script
-# Supports: Linux (Debian/Ubuntu, Fedora, Arch), macOS, Windows (WSL/Git Bash)
+# Supports: Linux (Debian/Ubuntu, Fedora, Arch), macOS, Windows (WSL2 only)
+# Requirements: Zsh shell
 
 set -e
 
@@ -46,9 +47,6 @@ detect_os() {
     elif [[ "$OSTYPE" == "darwin"* ]]; then
         OS="macos"
         DISTRO="macos"
-    elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
-        OS="windows"
-        DISTRO="windows"
     else
         OS="unknown"
         DISTRO="unknown"
@@ -84,7 +82,7 @@ install_packages() {
         ubuntu|debian|pop|linuxmint)
             log_info "Using apt package manager..."
             sudo apt update
-            sudo apt install -y tmux neovim kitty git curl build-essential python3 python3-pip ripgrep fd-find
+            sudo apt install -y tmux neovim kitty git curl build-essential python3 python3-pip ripgrep fd-find zsh
 
             # Create symlinks for fd (Debian/Ubuntu packages it as fd-find)
             if ! command_exists fd && command_exists fdfind; then
@@ -95,20 +93,20 @@ install_packages() {
         fedora|rhel|centos)
             log_info "Using dnf/yum package manager..."
             if command_exists dnf; then
-                sudo dnf install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find
+                sudo dnf install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh
             else
-                sudo yum install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find
+                sudo yum install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh
             fi
             ;;
 
         arch|manjaro|endeavouros)
             log_info "Using pacman package manager..."
-            sudo pacman -Syu --noconfirm tmux neovim kitty git curl base-devel python python-pip ripgrep fd
+            sudo pacman -Syu --noconfirm tmux neovim kitty git curl base-devel python python-pip ripgrep fd zsh
             ;;
 
         opensuse*)
             log_info "Using zypper package manager..."
-            sudo zypper install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd
+            sudo zypper install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd zsh
             ;;
 
         macos)
@@ -118,18 +116,7 @@ install_packages() {
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             fi
             brew update
-            brew install tmux neovim kitty git curl python ripgrep fd
-            ;;
-
-        windows)
-            log_warning "Windows detected. Please ensure you're using WSL for best experience."
-            log_info "Installing via Scoop (if available) or use WSL..."
-            if command_exists scoop; then
-                scoop install tmux neovim kitty git curl
-            else
-                log_warning "Please install packages manually or use WSL"
-                log_info "Recommend using WSL2 with Ubuntu for Windows users"
-            fi
+            brew install tmux neovim kitty git curl python ripgrep fd zsh
             ;;
 
         *)
@@ -216,12 +203,7 @@ install_tmux_config() {
 install_nvim_config() {
     log_info "Installing Neovim configuration..."
 
-    local nvim_config_dir
-    if [[ "$OS" == "windows" ]]; then
-        nvim_config_dir="$HOME/AppData/Local/nvim"
-    else
-        nvim_config_dir="$HOME/.config/nvim"
-    fi
+    local nvim_config_dir="$HOME/.config/nvim"
 
     backup_config "$nvim_config_dir"
 
@@ -236,14 +218,7 @@ install_nvim_config() {
 install_kitty_config() {
     log_info "Installing Kitty configuration..."
 
-    local kitty_config_dir
-    if [[ "$OS" == "macos" ]]; then
-        kitty_config_dir="$HOME/.config/kitty"
-    elif [[ "$OS" == "linux" ]]; then
-        kitty_config_dir="$HOME/.config/kitty"
-    elif [[ "$OS" == "windows" ]]; then
-        kitty_config_dir="$HOME/AppData/Roaming/kitty"
-    fi
+    local kitty_config_dir="$HOME/.config/kitty"
 
     backup_config "$kitty_config_dir"
 
@@ -253,18 +228,117 @@ install_kitty_config() {
     log_success "Kitty configuration installed"
 }
 
+# Install Oh My Zsh
+install_oh_my_zsh() {
+    log_info "Installing Oh My Zsh..."
+
+    # Check if zsh is installed
+    if ! command_exists zsh; then
+        log_warning "Zsh is not installed. Installing zsh first..."
+        case "$DISTRO" in
+            ubuntu|debian|pop|linuxmint)
+                sudo apt install -y zsh
+                ;;
+            fedora|rhel|centos)
+                if command_exists dnf; then
+                    sudo dnf install -y zsh
+                else
+                    sudo yum install -y zsh
+                fi
+                ;;
+            arch|manjaro|endeavouros)
+                sudo pacman -S --noconfirm zsh
+                ;;
+            opensuse*)
+                sudo zypper install -y zsh
+                ;;
+            macos)
+                brew install zsh
+                ;;
+            *)
+                log_error "Cannot install zsh automatically on $DISTRO"
+                log_info "Please install zsh manually and run this script again"
+                return 1
+                ;;
+        esac
+    fi
+
+    log_success "Zsh installed"
+
+    # Check if Oh My Zsh is already installed
+    if [ -d "$HOME/.oh-my-zsh" ]; then
+        log_info "Oh My Zsh is already installed"
+
+        # Update it
+        log_info "Updating Oh My Zsh..."
+        if [ -f "$HOME/.oh-my-zsh/tools/upgrade.sh" ]; then
+            env ZSH="$HOME/.oh-my-zsh" sh "$HOME/.oh-my-zsh/tools/upgrade.sh" || true
+        fi
+    else
+        # Install Oh My Zsh
+        log_info "Downloading and installing Oh My Zsh..."
+        RUNZSH=no CHSH=no sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true
+        log_success "Oh My Zsh installed"
+    fi
+
+    # Install popular plugins
+    local zsh_custom="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}"
+
+    # zsh-autosuggestions
+    if [ ! -d "$zsh_custom/plugins/zsh-autosuggestions" ]; then
+        log_info "Installing zsh-autosuggestions..."
+        git clone https://github.com/zsh-users/zsh-autosuggestions "$zsh_custom/plugins/zsh-autosuggestions"
+    fi
+
+    # zsh-syntax-highlighting
+    if [ ! -d "$zsh_custom/plugins/zsh-syntax-highlighting" ]; then
+        log_info "Installing zsh-syntax-highlighting..."
+        git clone https://github.com/zsh-users/zsh-syntax-highlighting "$zsh_custom/plugins/zsh-syntax-highlighting"
+    fi
+
+    # zsh-completions
+    if [ ! -d "$zsh_custom/plugins/zsh-completions" ]; then
+        log_info "Installing zsh-completions..."
+        git clone https://github.com/zsh-users/zsh-completions "$zsh_custom/plugins/zsh-completions"
+    fi
+
+    # Update .zshrc with recommended plugins and theme
+    if [ -f "$HOME/.zshrc" ]; then
+        # Backup original .zshrc
+        if ! grep -q "# Modified by terminal setup" "$HOME/.zshrc"; then
+            cp "$HOME/.zshrc" "$HOME/.zshrc.backup.$(date +%Y%m%d_%H%M%S)"
+
+            # Update theme to use a nice one
+            if grep -q '^ZSH_THEME=' "$HOME/.zshrc"; then
+                sed -i 's/^ZSH_THEME=.*/ZSH_THEME="robbyrussell"  # Modified by terminal setup/' "$HOME/.zshrc"
+            fi
+
+            # Update plugins
+            if grep -q '^plugins=' "$HOME/.zshrc"; then
+                sed -i 's/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)  # Modified by terminal setup/' "$HOME/.zshrc"
+            fi
+        fi
+    fi
+
+    # Offer to change default shell to zsh
+    if [ "$SHELL" != "$(which zsh)" ]; then
+        log_info "Your current shell is: $SHELL"
+        log_info "To make zsh your default shell, run: chsh -s \$(which zsh)"
+    fi
+
+    log_success "Oh My Zsh setup complete"
+}
+
 # Setup shell integrations
 setup_shell_integrations() {
-    log_info "Setting up shell integrations..."
+    log_info "Setting up zsh integrations..."
 
-    local shell_config
-    if [ -n "$BASH_VERSION" ]; then
-        shell_config="$HOME/.bashrc"
-    elif [ -n "$ZSH_VERSION" ]; then
-        shell_config="$HOME/.zshrc"
-    else
-        log_warning "Unknown shell, skipping shell integration"
-        return
+    local shell_config="$HOME/.zshrc"
+
+    # Ensure .zshrc exists
+    if [ ! -f "$shell_config" ]; then
+        log_warning ".zshrc not found. Oh My Zsh should have created it."
+        return 1
     fi
 
     # Add helpful aliases if not already present
@@ -318,15 +392,16 @@ show_menu() {
     echo ""
     echo "What would you like to do?"
     echo ""
-    echo "  1) Install all (packages + configs)"
+    echo "  1) Install all (packages + configs + Oh My Zsh)"
     echo "  2) Install packages only (tmux, nvim, kitty, fonts)"
     echo "  3) Install/update configs only (skip package installation)"
     echo "  4) Install tmux config only"
     echo "  5) Install neovim config only"
     echo "  6) Install kitty config only"
-    echo "  7) Exit"
+    echo "  7) Install Oh My Zsh only"
+    echo "  8) Exit"
     echo ""
-    read -p "Enter your choice [1-7]: " choice
+    read -p "Enter your choice [1-8]: " choice
     echo ""
 
     case $choice in
@@ -336,9 +411,10 @@ show_menu() {
         4) return 4 ;;
         5) return 5 ;;
         6) return 6 ;;
-        7) return 0 ;;
+        7) return 7 ;;
+        8) return 0 ;;
         *)
-            log_error "Invalid choice. Please select 1-7."
+            log_error "Invalid choice. Please select 1-8."
             show_menu
             return $?
             ;;
@@ -355,24 +431,32 @@ ${GREEN}======================================${NC}
 
 ${BLUE}Next Steps:${NC}
 
-1. ${YELLOW}Reload your shell configuration:${NC}
-   source ~/.bashrc  # or source ~/.zshrc
+1. ${YELLOW}Start using Zsh (if Oh My Zsh was installed):${NC}
+   exec zsh
+   # Or make it your default shell: chsh -s \$(which zsh)
 
-2. ${YELLOW}Start tmux and install plugins:${NC}
+2. ${YELLOW}Reload your shell configuration:${NC}
+   source ~/.zshrc
+
+3. ${YELLOW}Start tmux and install plugins:${NC}
    tmux
    # Press: Ctrl+b then Shift+i (to install plugins)
 
-3. ${YELLOW}Open Neovim to install plugins:${NC}
+4. ${YELLOW}Open Neovim to install plugins:${NC}
    nvim
    # Plugins will auto-install via lazy.nvim
    # Wait for all plugins to install, then restart nvim
 
-4. ${YELLOW}Start using Kitty terminal:${NC}
+5. ${YELLOW}Start using Kitty terminal:${NC}
    kitty
    # Your new terminal emulator with configs
 
+${BLUE}Troubleshooting:${NC}
+
+- If tmux plugins don't load: Prefix + Shift+i
 - If nvim has issues: Run :checkhealth in neovim
 - If fonts don't work: Restart your terminal
+- If zsh plugins don't work: Check ~/.zshrc for correct plugin list
 
 ${GREEN}Enjoy your new terminal setup!${NC}
 
@@ -386,10 +470,17 @@ main() {
     # Detect OS
     detect_os
 
-    # Check if running with appropriate permissions
-    if [[ "$OS" == "windows" ]] && ! command_exists git; then
-        log_error "Please run this script from Git Bash or WSL"
+    # Check for unsupported platforms
+    if [[ "$OS" == "unknown" ]]; then
+        log_error "Unsupported operating system"
+        log_info "This script supports Linux and macOS only (Windows users should use WSL2)"
         exit 1
+    fi
+
+    # Warn if not running in zsh
+    if [ -z "$ZSH_VERSION" ] && command_exists zsh; then
+        log_warning "You're not running zsh. This setup is designed for zsh."
+        log_info "After installation completes, switch to zsh with: exec zsh"
     fi
 
     # Show menu and get user choice
@@ -427,6 +518,9 @@ main() {
             else
                 log_warning "Kitty not installed, skipping config installation"
             fi
+
+            # Install Oh My Zsh
+            install_oh_my_zsh || log_warning "Oh My Zsh installation had issues"
 
             # Setup shell integrations
             setup_shell_integrations
@@ -523,6 +617,14 @@ main() {
                 exit 1
             fi
             log_success "Kitty configuration installed!"
+            exit 0
+            ;;
+
+        7)
+            # Install Oh My Zsh only
+            install_oh_my_zsh
+            log_success "Oh My Zsh installation complete!"
+            log_info "To start using zsh, run: exec zsh"
             exit 0
             ;;
     esac

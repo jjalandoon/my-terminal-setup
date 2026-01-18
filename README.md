@@ -1,6 +1,6 @@
 # Modern Terminal Setup
 
-A comprehensive, cross-platform terminal configuration featuring Neovim, Tmux, and Kitty with a beautiful Catppuccin Mocha theme.
+A comprehensive terminal configuration for Zsh featuring Neovim, Tmux, Kitty, and Oh My Zsh with a beautiful Catppuccin Mocha theme.
 
 ## Features
 
@@ -42,11 +42,25 @@ A comprehensive, cross-platform terminal configuration featuring Neovim, Tmux, a
   - Advanced keyboard shortcuts
   - Tab and window management
 
+### Oh My Zsh
+- **Framework**: Oh My Zsh for enhanced Zsh experience
+- **Auto-installed Plugins**:
+  - zsh-autosuggestions (intelligent command suggestions)
+  - zsh-syntax-highlighting (syntax highlighting for commands)
+  - zsh-completions (additional completion definitions)
+  - git (Git aliases and functions)
+- **Theme**: Robbyrussell (default, easily customizable)
+- **Features**:
+  - 300+ built-in plugins available
+  - Easy theme switching
+  - Command auto-completion
+  - Plugin management
+
 ## Supported Platforms
 
 - **Linux**: Ubuntu, Debian, Fedora, Arch, openSUSE
 - **macOS**: Via Homebrew
-- **Windows**: Via WSL2 (recommended) or Git Bash
+- **Windows**: Via WSL2 only (native Windows not supported)
 
 ## Installation
 
@@ -61,11 +75,12 @@ chmod +x install.sh
 
 The script will:
 1. Detect your OS and distribution
-2. Install required packages (tmux, neovim, kitty)
+2. Install required packages (tmux, neovim, kitty, zsh)
 3. Install Nerd Fonts
-4. Backup existing configurations
-5. Install new configurations
-6. Set up shell integrations
+4. Install Oh My Zsh with popular plugins
+5. Backup existing configurations
+6. Install new configurations
+7. Set up shell integrations
 
 ### Manual Installation
 
@@ -105,30 +120,38 @@ If you prefer to install manually or customize the process:
 
 ## Post-Installation
 
-### 1. Reload Shell Configuration
+### 1. Switch to Zsh (if Oh My Zsh was installed)
 ```bash
-source ~/.bashrc  # or source ~/.zshrc
+exec zsh
+# To make it your default shell:
+chsh -s $(which zsh)
 ```
 
-### 2. Install Tmux Plugins
+### 2. Reload Shell Configuration
+```bash
+source ~/.zshrc
+```
+
+### 3. Install Tmux Plugins
 ```bash
 tmux
 # Press: Ctrl+b then Shift+i
 ```
 
-### 3. Install Neovim Plugins
+### 4. Install Neovim Plugins
 ```bash
 nvim
 # Plugins will auto-install via lazy.nvim
 # Wait for completion, then restart nvim
 ```
 
-### 4. Verify Installation
+### 5. Verify Installation
 ```bash
 # Check installed versions
 tmux -V
 nvim --version
 kitty --version
+zsh --version
 ```
 
 ## Key Bindings
@@ -356,11 +379,21 @@ echo $TERM  # Should be "tmux-256color" in tmux or "xterm-256color" in terminal
 - ✅ Better tab management
 - ✅ Performance optimizations
 
+### Oh My Zsh
+- ✅ Auto-suggestions from history
+- ✅ Syntax highlighting for commands
+- ✅ Enhanced tab completions
+- ✅ Git status in prompt
+- ✅ 300+ plugins available
+- ✅ Easy theme customization
+- ✅ Command aliases and shortcuts
+
 ## Resources
 
 - [Neovim Documentation](https://neovim.io/doc/)
 - [Tmux Manual](https://man.openbsd.org/tmux.1)
 - [Kitty Documentation](https://sw.kovidgoyal.net/kitty/)
+- [Oh My Zsh](https://ohmyz.sh/)
 - [Kickstart.nvim](https://github.com/nvim-lua/kickstart.nvim)
 - [Catppuccin Theme](https://github.com/catppuccin/catppuccin)
 - [Nerd Fonts](https://www.nerdfonts.com/)
