@@ -60,6 +60,15 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Cross-platform sed -i (macOS requires different syntax)
+sed_inplace() {
+    if [[ "$OS" == "macos" ]]; then
+        sed -i '' "$@"
+    else
+        sed -i "$@"
+    fi
+}
+
 # Backup existing configuration
 backup_config() {
     local config_path="$1"
@@ -82,7 +91,14 @@ install_packages() {
         ubuntu|debian|pop|linuxmint)
             log_info "Using apt package manager..."
             sudo apt update
-            sudo apt install -y tmux neovim kitty git curl build-essential python3 python3-pip ripgrep fd-find zsh
+            sudo apt install -y tmux neovim kitty git curl build-essential python3 python3-pip ripgrep fd-find zsh unzip
+
+            # Install Node.js via NodeSource (apt version is often outdated)
+            if ! command_exists node; then
+                log_info "Installing Node.js..."
+                curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+                sudo apt install -y nodejs
+            fi
 
             # Create symlinks for fd (Debian/Ubuntu packages it as fd-find)
             if ! command_exists fd && command_exists fdfind; then
@@ -93,20 +109,20 @@ install_packages() {
         fedora|rhel|centos)
             log_info "Using dnf/yum package manager..."
             if command_exists dnf; then
-                sudo dnf install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh
+                sudo dnf install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh unzip nodejs npm
             else
-                sudo yum install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh
+                sudo yum install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd-find zsh unzip nodejs npm
             fi
             ;;
 
         arch|manjaro|endeavouros)
             log_info "Using pacman package manager..."
-            sudo pacman -Syu --noconfirm tmux neovim kitty git curl base-devel python python-pip ripgrep fd zsh
+            sudo pacman -Syu --noconfirm tmux neovim kitty git curl base-devel python python-pip ripgrep fd zsh unzip nodejs npm
             ;;
 
         opensuse*)
             log_info "Using zypper package manager..."
-            sudo zypper install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd zsh
+            sudo zypper install -y tmux neovim kitty git curl gcc make python3 python3-pip ripgrep fd zsh unzip nodejs npm
             ;;
 
         macos)
@@ -114,9 +130,18 @@ install_packages() {
             if ! command_exists brew; then
                 log_info "Installing Homebrew..."
                 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+                # Setup Homebrew PATH for Apple Silicon or Intel Macs
+                if [[ -f "/opt/homebrew/bin/brew" ]]; then
+                    # Apple Silicon
+                    eval "$(/opt/homebrew/bin/brew shellenv)"
+                elif [[ -f "/usr/local/bin/brew" ]]; then
+                    # Intel Mac
+                    eval "$(/usr/local/bin/brew shellenv)"
+                fi
             fi
             brew update
-            brew install tmux neovim kitty git curl python ripgrep fd zsh
+            brew install tmux neovim kitty git curl python ripgrep fd zsh node
             ;;
 
         *)
@@ -190,11 +215,8 @@ install_tmux_config() {
     # Install TPM
     install_tpm
 
-    # Install TPM plugins
-    if [ -f "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]; then
-        log_info "Installing Tmux plugins..."
-        "$HOME/.tmux/plugins/tpm/bin/install_plugins"
-    fi
+    # Note: TPM plugins will be installed when you first start tmux and press Prefix + I
+    log_info "Tmux Plugin Manager installed. Plugins will be installed when you run tmux and press Ctrl+b then Shift+i"
 
     log_success "Tmux configuration installed"
 }
@@ -310,12 +332,12 @@ install_oh_my_zsh() {
 
             # Update theme to use a nice one
             if grep -q '^ZSH_THEME=' "$HOME/.zshrc"; then
-                sed -i 's/^ZSH_THEME=.*/ZSH_THEME="robbyrussell"  # Modified by terminal setup/' "$HOME/.zshrc"
+                sed_inplace 's/^ZSH_THEME=.*/ZSH_THEME="robbyrussell"  # Modified by terminal setup/' "$HOME/.zshrc"
             fi
 
             # Update plugins
             if grep -q '^plugins=' "$HOME/.zshrc"; then
-                sed -i 's/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)  # Modified by terminal setup/' "$HOME/.zshrc"
+                sed_inplace 's/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting zsh-completions)  # Modified by terminal setup/' "$HOME/.zshrc"
             fi
         fi
     fi
@@ -339,6 +361,24 @@ setup_shell_integrations() {
     if [ ! -f "$shell_config" ]; then
         log_warning ".zshrc not found. Oh My Zsh should have created it."
         return 1
+    fi
+
+    # Add Homebrew PATH setup for macOS (must be before aliases)
+    if [[ "$OS" == "macos" ]] && ! grep -q "# Homebrew PATH setup" "$shell_config" 2>/dev/null; then
+        # Prepend Homebrew PATH setup to ensure it's loaded early
+        local temp_file=$(mktemp)
+        cat > "$temp_file" << 'EOF'
+# Homebrew PATH setup (added by terminal setup)
+if [[ -f "/opt/homebrew/bin/brew" ]]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [[ -f "/usr/local/bin/brew" ]]; then
+    eval "$(/usr/local/bin/brew shellenv)"
+fi
+
+EOF
+        cat "$shell_config" >> "$temp_file"
+        mv "$temp_file" "$shell_config"
+        log_success "Homebrew PATH setup added to $shell_config"
     fi
 
     # Add helpful aliases if not already present
@@ -368,14 +408,22 @@ verify_installations() {
 
     local all_good=true
 
-    for cmd in tmux nvim kitty git; do
+    for cmd in tmux nvim kitty git node npm; do
         if command_exists "$cmd"; then
-            log_success "$cmd is installed"
+            log_success "$cmd is installed ($(command -v $cmd))"
         else
             log_error "$cmd is NOT installed"
             all_good=false
         fi
     done
+
+    # Show versions for key tools
+    if command_exists node; then
+        log_info "Node.js version: $(node --version)"
+    fi
+    if command_exists npm; then
+        log_info "npm version: $(npm --version)"
+    fi
 
     if [ "$all_good" = true ]; then
         log_success "All required tools are installed!"
@@ -455,8 +503,10 @@ ${BLUE}Troubleshooting:${NC}
 
 - If tmux plugins don't load: Prefix + Shift+i
 - If nvim has issues: Run :checkhealth in neovim
+- If Mason LSP fails: Ensure node/npm are in PATH (run: node --version)
 - If fonts don't work: Restart your terminal
 - If zsh plugins don't work: Check ~/.zshrc for correct plugin list
+- macOS: If commands not found after install, restart terminal or run: source ~/.zshrc
 
 ${GREEN}Enjoy your new terminal setup!${NC}
 

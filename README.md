@@ -75,12 +75,28 @@ chmod +x install.sh
 
 The script will:
 1. Detect your OS and distribution
-2. Install required packages (tmux, neovim, kitty, zsh)
+2. Install required packages (tmux, neovim, kitty, zsh, node, npm)
 3. Install Nerd Fonts
 4. Install Oh My Zsh with popular plugins
 5. Backup existing configurations
 6. Install new configurations
 7. Set up shell integrations
+
+### macOS-Specific Notes
+
+On macOS, the script will:
+- Install Homebrew if not already installed
+- Automatically configure Homebrew PATH for both Apple Silicon and Intel Macs
+- Install Node.js (required for Neovim LSP servers via Mason)
+- Install all required packages via Homebrew
+
+**Important for macOS users:**
+- After installation, **restart your terminal** or run `source ~/.zshrc` to load the new PATH
+- Tmux plugins are NOT auto-installed. You must:
+  1. Start tmux: `tmux`
+  2. Press `Ctrl+b` then `Shift+i` to install plugins
+- Mason LSP servers require Node.js which is now included in the installation
+- Verify node is working: `node --version` and `npm --version`
 
 ### Manual Installation
 
@@ -89,16 +105,18 @@ If you prefer to install manually or customize the process:
 1. **Install dependencies**:
    ```bash
    # Ubuntu/Debian
-   sudo apt install tmux neovim kitty git curl build-essential ripgrep fd-find
+   sudo apt install tmux neovim kitty git curl build-essential ripgrep fd-find zsh unzip
+   curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+   sudo apt install -y nodejs
 
    # Fedora
-   sudo dnf install tmux neovim kitty git curl gcc make ripgrep fd-find
+   sudo dnf install tmux neovim kitty git curl gcc make ripgrep fd-find zsh unzip nodejs npm
 
    # Arch
-   sudo pacman -S tmux neovim kitty git curl base-devel ripgrep fd
+   sudo pacman -S tmux neovim kitty git curl base-devel ripgrep fd zsh unzip nodejs npm
 
    # macOS
-   brew install tmux neovim kitty git curl ripgrep fd
+   brew install tmux neovim kitty git curl ripgrep fd zsh node
    ```
 
 2. **Install configurations**:
@@ -314,6 +332,26 @@ Then run `Prefix + Shift+i` to install.
 
 ## Troubleshooting
 
+### Mason LSP servers not installing
+```bash
+# Verify Node.js and npm are in PATH
+node --version
+npm --version
+
+# If "command not found", restart your terminal or reload zsh config:
+source ~/.zshrc
+
+# macOS: If still not working, ensure Homebrew PATH is set
+# For Apple Silicon:
+eval "$(/opt/homebrew/bin/brew shellenv)"
+# For Intel Mac:
+eval "$(/usr/local/bin/brew shellenv)"
+
+# Then in Neovim, run
+:Mason
+# Select the LSP server and press 'i' to install
+```
+
 ### Tmux plugins not loading
 ```bash
 # Reinstall TPM
@@ -325,7 +363,7 @@ git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 
 ### Neovim issues
 ```bash
-# Check health
+# Check health (this will show if Node.js/npm is missing)
 nvim +checkhealth
 
 # Clear plugin cache
