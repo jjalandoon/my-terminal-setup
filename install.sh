@@ -195,9 +195,17 @@ install_tpm() {
     local tpm_path="$HOME/.tmux/plugins/tpm"
 
     if [ ! -d "$tpm_path" ]; then
-        log_info "Installing Tmux Plugin Manager..."
-        git clone https://github.com/tmux-plugins/tpm "$tpm_path"
-        log_success "TPM installed"
+        log_info "Installing Tmux Plugin Manager (cloning from GitHub)..."
+        mkdir -p "$HOME/.tmux/plugins"
+        # Use --depth 1 for faster clone, disable prompts with GIT_TERMINAL_PROMPT=0
+        if GIT_TERMINAL_PROMPT=0 git clone --depth 1 https://github.com/tmux-plugins/tpm.git "$tpm_path" 2>&1; then
+            log_success "TPM installed"
+        else
+            log_error "Failed to clone TPM. Check your internet connection."
+            log_info "You can manually install TPM later with:"
+            log_info "  git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm"
+            return 1
+        fi
     else
         log_info "TPM already installed"
     fi
@@ -211,13 +219,12 @@ install_tmux_config() {
     backup_config "$tmux_conf"
 
     cp "$SCRIPT_DIR/tmux.conf" "$tmux_conf"
+    log_success "Tmux config file copied to $tmux_conf"
 
-    # Install TPM
-    install_tpm
+    # Install TPM (non-blocking, continues even if it fails)
+    install_tpm || true
 
-    # Note: TPM plugins will be installed when you first start tmux and press Prefix + I
-    log_info "Tmux Plugin Manager installed. Plugins will be installed when you run tmux and press Ctrl+b then Shift+i"
-
+    log_info "To install tmux plugins: start tmux, then press Ctrl+b followed by Shift+i"
     log_success "Tmux configuration installed"
 }
 
@@ -309,19 +316,19 @@ install_oh_my_zsh() {
     # zsh-autosuggestions
     if [ ! -d "$zsh_custom/plugins/zsh-autosuggestions" ]; then
         log_info "Installing zsh-autosuggestions..."
-        git clone https://github.com/zsh-users/zsh-autosuggestions "$zsh_custom/plugins/zsh-autosuggestions"
+        GIT_TERMINAL_PROMPT=0 git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git "$zsh_custom/plugins/zsh-autosuggestions" || log_warning "Failed to install zsh-autosuggestions"
     fi
 
     # zsh-syntax-highlighting
     if [ ! -d "$zsh_custom/plugins/zsh-syntax-highlighting" ]; then
         log_info "Installing zsh-syntax-highlighting..."
-        git clone https://github.com/zsh-users/zsh-syntax-highlighting "$zsh_custom/plugins/zsh-syntax-highlighting"
+        GIT_TERMINAL_PROMPT=0 git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git "$zsh_custom/plugins/zsh-syntax-highlighting" || log_warning "Failed to install zsh-syntax-highlighting"
     fi
 
     # zsh-completions
     if [ ! -d "$zsh_custom/plugins/zsh-completions" ]; then
         log_info "Installing zsh-completions..."
-        git clone https://github.com/zsh-users/zsh-completions "$zsh_custom/plugins/zsh-completions"
+        GIT_TERMINAL_PROMPT=0 git clone --depth 1 https://github.com/zsh-users/zsh-completions.git "$zsh_custom/plugins/zsh-completions" || log_warning "Failed to install zsh-completions"
     fi
 
     # Update .zshrc with recommended plugins and theme
